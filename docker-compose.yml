@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  db1:
+    build: .
+    image: mysql:8.0.20
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+    ports:
+      - '3306:3306'
+    volumes:
+      - db1:/var/lib/mysql
+  
+  db2:
+    build: .
+    image: mysql:8.0.20
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+    ports:
+      - '3307:3306'
+    volumes:
+      - db2:/var/lib/mysql
+
+  db3:
+    build: .
+    image: mysql:8.0.20
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+    ports:
+      - '3308:3306'
+    volumes:
+      - db3:/var/lib/mysql  
+
+volumes:
+  db1:
+  db2:
+  db3:
