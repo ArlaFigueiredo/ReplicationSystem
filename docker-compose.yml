@@ -5,7 +5,7 @@ services:
     build: .
     image: mysql:8.0.20
     environment:
-      - MYSQL_ROOT_PASSWORD=odeio_sd1
+      - MYSQL_ROOT_PASSWORD=password
     ports:
       - '3306:3306'
     volumes:
@@ -15,7 +15,7 @@ services:
     build: .
     image: mysql:8.0.20
     environment:
-      - MYSQL_ROOT_PASSWORD=odeio_sd1
+      - MYSQL_ROOT_PASSWORD=password
     ports:
       - '3307:3306'
     volumes:
@@ -25,7 +25,7 @@ services:
     build: .
     image: mysql:8.0.20
     environment:
-      - MYSQL_ROOT_PASSWORD=odeio_sd1
+      - MYSQL_ROOT_PASSWORD=password
     ports:
       - '3308:3306'
     volumes:
