@@ -1,14 +1,15 @@
 import socket
+import logging
 
-# IP do Servidor Replication-Manager
-IP_RM = "localhost"
-# Porta socket Servidor Replication-Manager
-PORT_RM = 8900
+from config import settings
+
+# Create a logger
+logger = logging.getLogger(__name__)
 
 
 class ClientSQL:
     def __init__(self):
-        self.addr = (IP_RM, PORT_RM)
+        self.addr = (settings.server.HOST, settings.server.PORT)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def __start_connection(self):
@@ -32,6 +33,9 @@ class ClientSQL:
         :return:
         """
 
-        self.__start_connection()
-        self.client_socket.send(command.encode('UTF-8'))
-        self.__close_connection()
+        try:
+            self.__start_connection()
+            self.client_socket.send(command.encode('UTF-8'))
+            self.__close_connection()
+        except Exception as e:
+            logger.exception(e)
