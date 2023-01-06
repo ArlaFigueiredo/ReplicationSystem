@@ -1,7 +1,9 @@
 import socket
 import logging
+import pickle
 
 from config import settings
+from message_params import MessageType, SenderTypes
 
 # Create a logger
 logger = logging.getLogger(__name__)
@@ -35,7 +37,12 @@ class ClientSQL:
 
         try:
             self.__start_connection()
-            self.client_socket.send(command.encode('UTF-8'))
+            msg = {
+                "sender": SenderTypes.CLIENT,
+                "type": MessageType.SQL_COMMAND,
+                "content": command
+            }
+            self.client_socket.send(pickle.dumps(msg))
             self.__close_connection()
         except Exception as e:
             logger.exception(e)
