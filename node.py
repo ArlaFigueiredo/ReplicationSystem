@@ -14,7 +14,7 @@ class Node:
         self.socket = socket.socket(family=socket.AF_INET)
         self.socket_members = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        self.members = []
+        self.members = {}
         self.is_leader = False
         self.queue_commands = []
 
@@ -45,6 +45,11 @@ class Node:
     def __treat_rm_message(self, message: dict):
         if message["type"] == MessageType.CONFIRM:
             self.members = message["content"]
+            if message["receiver"][1] == self.port:
+                self.idf = message["identifier"]
+            if len(self.members.keys) == 1:
+                self.is_leader = True
+
         if message["type"] == MessageType.SQL_COMMAND and self.is_leader:
             self.queue_commands.append(message["content"])
 
@@ -116,6 +121,9 @@ class Node:
                 }
 
             self.send_to_all_members(msg=msg)
+
+    def heart_beat(self):
+        pass
 
     def listen_connections(self):
         """

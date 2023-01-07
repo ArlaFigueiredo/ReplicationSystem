@@ -14,7 +14,7 @@ class ReplicationManagerServer:
         self.socket = socket.socket()
         self.socket_dbm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        self.db_managers = []
+        self.db_managers = {}
         self.counter = 0
 
     def __include_dbm_member(self, host: str, port: int):
@@ -24,7 +24,7 @@ class ReplicationManagerServer:
         :param port:
         :return:
         """
-        self.db_managers.append((host, port))
+        self.db_managers[self.counter] = (host, port)
 
     def __treat_dbm_message(self, message: dict):
         """
@@ -36,12 +36,13 @@ class ReplicationManagerServer:
             self.__include_dbm_member(host=message["addr"][0], port=message["addr"][1])
             msg = {
                 "sender": SenderTypes.SERVER_RM,
+                "receiver": message["addr"],
+                "identifier": self.counter,
                 "type": MessageType.CONFIRM,
                 "content": self.db_managers
             }
-            # TODO: Enviar para todos os membros
-            # TODO: Enviar o identificador do membro
-            self.send(msg=msg, addr=message["addr"], type_message=MessageType.CONFIRM)
+            self.__increment_counter()
+            self.send_to_all_dbm(msg=msg)
 
     def __increment_counter(self):
         self.counter += 1
@@ -60,19 +61,14 @@ class ReplicationManagerServer:
         """
         self.socket_dbm.close()
 
-    def send(self, msg: dict, addr, type_message=MessageType.SQL_COMMAND):
+    def send(self, msg: dict, addr):
         """
         Send SQL command to RM server
         :param msg: msg
         :param addr: addr
-        :param type_message
         :return:
         """
-        msg = {
-            "sender": SenderTypes.SERVER_RM,
-            "type": type_message,
-            "content": msg['content']
-        }
+
         self.__start_connection(addr)
         self.socket_dbm.send(pickle.dumps(msg))
         self.__close_connection()
@@ -83,7 +79,7 @@ class ReplicationManagerServer:
         :param msg:
         :return:
         """
-        for addr in self.db_managers:
+        for idf, addr in self.db_managers.items():
             self.send(msg, addr)
 
     def __bind(self):
@@ -110,7 +106,12 @@ class ReplicationManagerServer:
             else:
                 message = pickle.loads(encoded_message)
                 if message["sender"] == SenderTypes.CLIENT:
-                    self.send_to_all_dbm(message)
+                    msg = {
+                        "sender": SenderTypes.SERVER_RM,
+                        "type": MessageType.SQL_COMMAND,
+                        "content": message['content']
+                    }
+                    self.send_to_all_dbm(msg)
                 if message["sender"] == SenderTypes.SERVER_DBM:
                     self.__treat_dbm_message(message)
 
