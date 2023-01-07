@@ -231,7 +231,9 @@ class Node:
             "content": "Are you alive?",
         }
 
-        if self.is_leader:
+        self.send(msg=msg, addr=(settings.server.HOST, settings.server.PORT))
+
+        """if self.is_leader:
             print("[heart_beat] is leader")
             for idf, member_addr in self.members.items():
                 print(f"[heart_beat] enviando para {member_addr}")
@@ -250,7 +252,7 @@ class Node:
                 self.send(msg=msg, addr=self.leader_addr)
             except ConnectionRefusedError:
                 print("O líder está off, vou iniciar uma eleição.")
-                # TODO: Iniciar Eleição
+                # TODO: Iniciar Eleição"""
 
         # await asyncio.sleep(10)
 
