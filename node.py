@@ -48,6 +48,11 @@ class Node:
         if message["type"] == MessageType.SQL_COMMAND and self.is_leader:
             self.queue_commands.append(message["content"])
 
+    def __treat_dbm_message(self, message: dict):
+        # Tratar resposta do STAGE (CONFIRM)
+        # Tratar resposta do PING (HEART BEAT)
+        pass
+
     def send(self, msg: dict, addr):
         """
         Send SQL command to others server
@@ -86,7 +91,7 @@ class Node:
         :return:
         """
         while True:
-            if self.is_leader or not self.queue_commands:
+            if not self.is_leader or not self.queue_commands:
                 continue
 
             if self.message_stage:
@@ -96,6 +101,7 @@ class Node:
                         "type": MessageType.COMMIT,
                         "content": self.message_stage["command"]
                     }
+                    self.message_stage = None
                 else:
                     continue
             else:
@@ -130,9 +136,13 @@ class Node:
                 if message["sender"] == SenderTypes.SERVER_RM:
                     self.__treat_rm_message(message)
 
+                if message["sender"] == SenderTypes.SERVER_DBM:
+                    self.__treat_dbm_message(message)
+
             conn.close()
 
 
 server = Node(host="localhost", port=8942)
 server.request_group_add()
+# TODO: Colocar 3 funções em uma thread
 server.listen_connections()

@@ -39,6 +39,8 @@ class ReplicationManagerServer:
                 "type": MessageType.CONFIRM,
                 "content": self.db_managers
             }
+            # TODO: Enviar para todos os membros
+            # TODO: Enviar o identificador do membro
             self.send(msg=msg, addr=message["addr"], type_message=MessageType.CONFIRM)
 
     def __increment_counter(self):
