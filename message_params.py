@@ -8,6 +8,7 @@ class MessageType(Enum):
     COMMIT = 4
     LEADER_ELECTION = 5
     HEART_BEAT = 6
+    REQUEST = 7
 
 
 class SenderTypes(Enum):

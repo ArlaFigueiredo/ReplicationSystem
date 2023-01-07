@@ -1,57 +1,38 @@
 import socket
-from message_type import MessageType
-from message import Message
+import pickle
+
+from message_params import MessageType, SenderTypes
+from config import settings
 
 
 class Node:
-    def __init__(self, idf, port, is_leader):
-        self.idf = idf
+    def __init__(self, host, port):
+        self.idf = None
+        self.host = host
         self.port = port
-        self.host = 'localhost'
-        self.socket = socket.socket()
+
+        self.socket = socket.socket(family=socket.AF_INET)
         self.socket_members = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        self.members = [
-            ("localhost", 8901),
-            ("localhost", 8902),
-            ("localhost", 8903),
-        ]
-        self.is_leader = is_leader
+        self.members = []
+        self.is_leader = False
+        self.queue_commands = []
+
+        self.message_stage = None
 
     def __start_connection(self, addr):
         """
-        Start connection with RM
+        Start connection
         :return:
         """
         self.socket_members.connect(addr)
 
     def __close_connection(self):
         """
-        Closes connection with RM
+        Closes connection
         :return:
         """
         self.socket_members.close()
-
-    def send(self, msg: str, addr):
-        """
-        Send SQL command to RM server
-        :param msg: msg
-        :param addr: addr
-        :return:
-        """
-
-        self.__start_connection(addr)
-        self.socket_members.send(msg.encode('UTF-8'))
-        self.__close_connection()
-
-    def send_to_all_members(self, msg):
-        """
-
-        :param msg:
-        :return:
-        """
-        for addr_server in self.members:
-            self.send(msg, addr_server)
 
     def __bind(self):
         """
@@ -61,38 +42,97 @@ class Node:
         self.socket.bind((self.host, self.port))
         self.socket.listen(0)
 
-    def listen(self):
+    def __treat_rm_message(self, message: dict):
+        if message["type"] == MessageType.CONFIRM:
+            self.members = message["content"]
+        if message["type"] == MessageType.SQL_COMMAND and self.is_leader:
+            self.queue_commands.append(message["content"])
+
+    def send(self, msg: dict, addr):
         """
-        Listen nodes
+        Send SQL command to others server
+        :param msg: msg
+        :param addr: addr
+        :return:
+        """
+
+        self.__start_connection(addr)
+        self.socket_members.send(pickle.dumps(msg))
+        self.__close_connection()
+
+    def request_group_add(self):
+        msg = {
+            "sender": SenderTypes.SERVER_DBM,
+            "type": MessageType.REQUEST,
+            "addr": (self.host, self.port),
+            "content": "I want join to the group."
+        }
+        self.send(msg=msg, addr=(settings.server.HOST, settings.server.PORT))
+
+    def send_to_all_members(self, msg):
+        """
+
+        :param msg:
+        :return:
+        """
+        for addr_member in self.members:
+            if addr_member[1] == self.port:
+                continue
+            self.send(msg, addr_member)
+
+    def coordinate(self):
+        """
+
+        :return:
+        """
+        while True:
+            if self.is_leader or not self.queue_commands:
+                continue
+
+            if self.message_stage:
+                if self.message_stage["number_confirms"] == len(self.members) - 1:
+                    msg = {
+                        "sender": SenderTypes.SERVER_DBM,
+                        "type": MessageType.COMMIT,
+                        "content": self.message_stage["command"]
+                    }
+                else:
+                    continue
+            else:
+                self.message_stage = {
+                    "command": self.queue_commands.pop(),
+                    "number_confirms": 0
+                }
+                msg = {
+                    "sender": SenderTypes.SERVER_DBM,
+                    "type": MessageType.STAGE,
+                    "content": self.message_stage["command"]
+                }
+
+            self.send_to_all_members(msg=msg)
+
+    def listen_connections(self):
+        """
+        Listen external connections
         :return:
         """
         self.__bind()
 
         while True:
-            client, addr = self.socket.accept()
+            conn, addr = self.socket.accept()
 
-            msg = client.recv(1000)
-            if len(msg) == 0:
+            encoded_message = conn.recv(1000)
+            if len(encoded_message) == 0:
                 pass
             else:
-                if msg.type == MessageType.CLIENT_SQL_COMMAND:
-                    if self.is_leader:
-                        new_msg = Message(type=MessageType.STAGE, content=msg.content)
-                        self.send_to_all_members(new_msg)
-                    else:
-                        # Se não for o lider ele ignora
-                        pass
-                if msg.type == MessageType.CONFIRM:
-                    new_msg = Message(type=MessageType.COMMIT, content=msg.content)
-                    self.send_to_all_members(new_msg)
+                message = pickle.loads(encoded_message)
 
-                if msg.type == MessageType.STAGE:
-                    new_msg = Message(type=MessageType.CONFIRM, content=msg.content)
-                    self.send_to_all_members(new_msg)
+                if message["sender"] == SenderTypes.SERVER_RM:
+                    self.__treat_rm_message(message)
 
-                if msg.type == MessageType.COMMIT:
-                    # Faria o commit
-                    pass
+            conn.close()
 
-            # Encerra Conexão com o Cliente
-            client.close()
+
+server = Node(host="localhost", port=8942)
+server.request_group_add()
+server.listen_connections()
