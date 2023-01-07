@@ -53,7 +53,7 @@ class Node:
         :return:
         """
         self.socket.bind((self.host, self.port))
-        self.socket.listen(0)
+        self.socket.listen(30)
 
     def __treat_rm_message(self, message: dict):
         """
@@ -104,14 +104,21 @@ class Node:
         if message["type"] == MessageType.HEART_BEAT:
 
             print(f"Recebendo um Heart Beat de {message['addr']}")
-            member_info = self.alive_checker.get(message["addr"])
-            if not member_info:
+
+            if self.is_leader:
+                try:
+                    self.alive_checker.pop(message["addr"])
+                except KeyError:
+                    pass
+            else:
+                self.leader_alive_checker = None
+            """if not member_info:
                 self.alive_checker[message["addr"]] = {
                     "last_sended_at": datetime.now(),
                     "confirmed_at": datetime.now()
                 }
             else:
-                self.alive_checker[message["addr"]]["confirmed_at"] = datetime.now()
+                self.alive_checker[message["addr"]]["confirmed_at"] = datetime.now()"""
 
         if message["type"] == MessageType.STAGE:
             msg = {
@@ -215,6 +222,7 @@ class Node:
         :return:
         """
         while True:
+            print("Rodando [heart-beat]")
 
             msg = {
                 "sender": SenderTypes.SERVER_DBM,
@@ -242,9 +250,6 @@ class Node:
                             # TODO: Remover esse membro do grupo
                             pass
 
-                        if member_info["confirmed_at"]:
-                            self.alive_checker.pop(member_addr)
-
             else:
                 if not self.leader_alive_checker:
                     self.leader_alive_checker = {
@@ -259,10 +264,7 @@ class Node:
                         # TODO: Iniciar Eleição
                         pass
 
-                    if self.leader_alive_checker["confirmed_at"]:
-                        self.leader_alive_checker = None
-
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
 
     async def listen_connections(self):
         """
@@ -309,7 +311,7 @@ async def start():
     task_list.append(asyncio.create_task(server.request_group_add()))
     task_list.append(asyncio.create_task(server.listen_connections()))
     task_list.append(asyncio.create_task(server.coordinate()))
-    task_list.append(asyncio.create_task(server.heart_beat()))
+    #task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
