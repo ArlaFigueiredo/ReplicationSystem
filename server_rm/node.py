@@ -8,6 +8,7 @@ from datetime import datetime
 
 from message_params import MessageType, SenderTypes
 from config import settings
+from database.db import execute_sql
 
 # Create a logger
 logger = logging.getLogger(__name__)
@@ -112,13 +113,6 @@ class Node:
                     pass
             else:
                 self.leader_alive_checker = None
-            """if not member_info:
-                self.alive_checker[message["addr"]] = {
-                    "last_sended_at": datetime.now(),
-                    "confirmed_at": datetime.now()
-                }
-            else:
-                self.alive_checker[message["addr"]]["confirmed_at"] = datetime.now()"""
 
         if message["type"] == MessageType.STAGE:
             msg = {
@@ -134,7 +128,7 @@ class Node:
             self.send(msg=msg, addr=self.leader_addr)
 
         if message["type"] == MessageType.COMMIT:
-            # TODO: Lógica para commitar a mensagem
+            execute_sql(idf=self.idf, sql_raw=self.message_stage)
             self.message_stage = None
             print(f"[DataBase {self.host}: {self.port}] Commitando ...")
 
@@ -193,9 +187,8 @@ class Node:
                         "content": self.message_stage["command"]
                     }
                     self.send_to_all_members(msg=msg)
-
+                    execute_sql(idf=self.idf, sql_raw=self.message_stage["command"])
                     self.message_stage = None
-                    # TODO: O nó lider deve commitar tbm
                 else:
                     continue
 
