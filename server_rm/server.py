@@ -15,6 +15,7 @@ class ReplicationManagerServer:
         self.socket_dbm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.db_managers = {}
+        self.leader_addr = None
         self.counter = 0
 
     def __include_dbm_member(self, host: str, port: int):
@@ -37,12 +38,16 @@ class ReplicationManagerServer:
             msg = {
                 "sender": SenderTypes.SERVER_RM,
                 "receiver": message["addr"],
+                "leader_addr": self.leader_addr,
                 "identifier": self.counter,
                 "type": MessageType.CONFIRM,
                 "content": self.db_managers
             }
             self.__increment_counter()
             self.send_to_all_dbm(msg=msg)
+
+        if message["type"] == MessageType.LEADER_ANNOUNCE:
+            self.leader_addr = message["addr"]
 
     def __increment_counter(self):
         self.counter += 1

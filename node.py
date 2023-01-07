@@ -16,6 +16,7 @@ class Node:
 
         self.members = {}
         self.is_leader = False
+        self.leader_addr = None
         self.queue_commands = []
 
         self.message_stage = None
@@ -45,13 +46,29 @@ class Node:
     def __treat_rm_message(self, message: dict):
         if message["type"] == MessageType.CONFIRM:
             self.members = message["content"]
+            self.leader_addr = message["leader_addr"]
             if message["receiver"][1] == self.port:
                 self.idf = message["identifier"]
             if len(self.members.keys) == 1:
-                self.is_leader = True
+                self.upgrade_to_leader()
 
         if message["type"] == MessageType.SQL_COMMAND and self.is_leader:
             self.queue_commands.append(message["content"])
+
+    def upgrade_to_leader(self):
+
+        self.is_leader = True
+        self.leader_addr = (self.host, self.port)
+
+        msg = {
+            "sender": SenderTypes.SERVER_DBM,
+            "type": MessageType.LEADER_ANNOUNCE,
+            "addr": (self.host, self.port),
+            "content": "I'm the new coordinator."
+        }
+        # Send message to rm  and members
+        self.send(msg=msg, addr=(settings.server.HOST, settings.server.PORT))
+        self.send_to_all_members(msg=msg)
 
     def __treat_dbm_message(self, message: dict):
         # Tratar resposta do STAGE (CONFIRM)
