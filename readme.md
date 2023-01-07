@@ -1,4 +1,5 @@
 # ReplicationSystem
+Alunos: Arla Figueiredo, Juliana Ribeiro, Rafael Campos
 
 Este projeto consiste em um trabalho para a Disciplina de Sistemas Distribuidos.
 
