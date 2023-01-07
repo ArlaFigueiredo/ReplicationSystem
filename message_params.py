@@ -2,13 +2,17 @@ from enum import Enum
 
 
 class MessageType(Enum):
-    SQL_COMMAND = 1
-    STAGE = 2
-    CONFIRM = 3
-    COMMIT = 4
-    LEADER_ELECTION = 5
+
+    GROUP_REQUEST = 1
+    SQL_COMMAND = 2
+
+    STAGE = 3
+    CONFIRM = 4
+    COMMIT = 5
+
     HEART_BEAT = 6
-    REQUEST = 7
+
+    LEADER_ELECTION = 7
     LEADER_ANNOUNCE = 8
 
 
