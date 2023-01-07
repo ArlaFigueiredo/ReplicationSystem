@@ -26,6 +26,11 @@ class Node:
         self.queue_commands = []
         self.message_stage = None
 
+        self.alive_checker = {}
+        self.leader_alive_checker = None
+
+        self.last_execute = datetime.now()
+
     def __start_connection(self, addr):
         """
         Start connection
@@ -71,6 +76,10 @@ class Node:
             print(f"[DataBase {self.host}:{self.port}] Líder recebeu o comando SQL e irá enviar aos demais.")
             self.queue_commands.append(message["content"])
 
+        if message["type"] == MessageType.HEART_BEAT:
+
+            print(f"Recebendo um Heart Beat de RM")
+
     def upgrade_to_leader(self):
 
         print(f"[DataBase {self.host}:{self.port}] Upgrade para líder.")
@@ -95,9 +104,17 @@ class Node:
             print(f"[DataBase {self.host}: {self.port}] Recebido confirmação de recebimento de {message['addr']}")
             self.message_stage["number_confirms"] += 1
 
-        if message["type"] == MessageType.HEART_BEAT:
-            # Tratar resposta do PING (HEART BEAT)
-            pass
+        """if message["type"] == MessageType.HEART_BEAT:
+
+            print(f"Recebendo um Heart Beat de {message['addr']}")
+
+            if self.is_leader:
+                try:
+                    self.alive_checker.pop(message["addr"])
+                except KeyError:
+                    pass
+            else:
+                self.leader_alive_checker = None"""
 
         if message["type"] == MessageType.STAGE:
             msg = {
@@ -158,7 +175,9 @@ class Node:
         :return:
         """
         while True:
-            if not self.is_leader or not self.queue_commands:
+
+            if not self.is_leader:
+                await asyncio.sleep(3)
                 continue
 
             if self.message_stage:
@@ -185,10 +204,50 @@ class Node:
 
             self.send_to_all_members(msg=msg)
 
-    def heart_beat(self):
-        pass
+            await asyncio.sleep(1)
 
-    def listen_connections(self):
+    async def heart_beat(self):
+        """
+
+        :return:
+        """
+        # while True:
+        if (datetime.now() - self.last_execute).seconds < 30:
+            return
+
+        self.last_execute = datetime.now()
+
+        msg = {
+            "sender": SenderTypes.SERVER_DBM,
+            "type": MessageType.HEART_BEAT,
+            "addr": (self.host, self.port),
+            "content": "Are you alive?",
+        }
+
+        if self.is_leader:
+            print("[heart_beat] is leader")
+            for idf, member_addr in self.members.items():
+                print(f"[heart_beat] enviando para {member_addr}")
+                if idf == self.idf:
+                    continue
+                try:
+                    self.send(msg=msg, addr=member_addr)
+                except ConnectionRefusedError:
+                    print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
+                    # TODO: Remover
+
+        else:
+            print("[heart_beat] is replica")
+            try:
+                print(f"[heart_beat] enviando para lider")
+                self.send(msg=msg, addr=self.leader_addr)
+            except ConnectionRefusedError:
+                print("O líder está off, vou iniciar uma eleição.")
+                # TODO: Iniciar Eleição
+
+        # await asyncio.sleep(10)
+
+    async def listen_connections(self):
         """
         Listen external connections
         :return:
@@ -224,5 +283,15 @@ process_list.append(Process(target=server.coordinate()))
 for t in process_list:
     t.start()
 
-for t in process_list:
-    t.join()
+    server = Node(host=args.host, port=int(args.port))
+
+    task_list = list()
+
+    task_list.append(asyncio.create_task(server.request_group_add()))
+    task_list.append(asyncio.create_task(server.listen_connections()))
+    task_list.append(asyncio.create_task(server.coordinate()))
+    # task_list.append(asyncio.create_task(server.heart_beat()))
+
+    await asyncio.gather(*task_list)
+
+asyncio.run(start())
