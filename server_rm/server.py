@@ -34,6 +34,7 @@ class ReplicationManagerServer:
         :return:
         """
         if message["type"] == MessageType.GROUP_REQUEST:
+            print(f"[Server RM] Requisição de entrada no grupo de {message['addr']}")
             self.__include_dbm_member(host=message["addr"][0], port=message["addr"][1])
             msg = {
                 "sender": SenderTypes.SERVER_RM,
@@ -47,6 +48,7 @@ class ReplicationManagerServer:
             self.send_to_all_dbm(msg=msg)
 
         if message["type"] == MessageType.LEADER_ANNOUNCE:
+            print("[Server RM] Novo líder do grupo foi elegido.")
             self.leader_addr = message["addr"]
 
     def __increment_counter(self):
@@ -102,6 +104,7 @@ class ReplicationManagerServer:
         """
         self.__bind()
 
+        print("[Server RM] Escutando conexões")
         while True:
             conn, addr = self.socket.accept()
 
@@ -109,6 +112,7 @@ class ReplicationManagerServer:
             if len(encoded_message) == 0:
                 pass
             else:
+                print("[Server RM] Nova mensagem recebida.")
                 message = pickle.loads(encoded_message)
                 if message["sender"] == SenderTypes.CLIENT:
                     msg = {

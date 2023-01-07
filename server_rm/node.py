@@ -1,8 +1,13 @@
 import socket
 import pickle
+import logging
 
+from multiprocessing import Process
 from message_params import MessageType, SenderTypes
 from config import settings
+
+# Create a logger
+logger = logging.getLogger(__name__)
 
 
 class Node:
@@ -12,7 +17,7 @@ class Node:
         self.port = port
 
         self.socket = socket.socket()
-        self.socket_members = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket_members = None
 
         self.members = {}
         self.is_leader = False
@@ -26,6 +31,7 @@ class Node:
         Start connection
         :return:
         """
+        self.socket_members = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket_members.connect(addr)
 
     def __close_connection(self):
@@ -52,15 +58,22 @@ class Node:
         if message["type"] == MessageType.CONFIRM:
             self.members = message["content"]
             self.leader_addr = message["leader_addr"]
+
             if message["receiver"][0] == self.host and message["receiver"][1] == self.port:
                 self.idf = message["identifier"]
-            if len(self.members.keys) == 1:
-                self.upgrade_to_leader()
+                print(f"[DataBase {self.host}:{self.port}] Adicionado ao grupo com sucesso com o "
+                            f"identificador {self.idf}")
+
+                if len(self.members.keys()) == 1:
+                    self.upgrade_to_leader()
 
         if message["type"] == MessageType.SQL_COMMAND and self.is_leader:
+            print(f"[DataBase {self.host}:{self.port}] Líder recebeu o comando SQL e irá enviar aos demais.")
             self.queue_commands.append(message["content"])
 
     def upgrade_to_leader(self):
+
+        print(f"[DataBase {self.host}:{self.port}] Upgrade para líder.")
 
         self.is_leader = True
         self.leader_addr = (self.host, self.port)
@@ -71,6 +84,7 @@ class Node:
             "addr": (self.host, self.port),
             "content": "I'm the new coordinator."
         }
+
         # Send message to rm  and members
         self.send(msg=msg, addr=(settings.server.HOST, settings.server.PORT))
         self.send_to_all_members(msg=msg)
@@ -78,6 +92,7 @@ class Node:
     def __treat_dbm_message(self, message: dict):
 
         if message["type"] == MessageType.CONFIRM:
+            print(f"[DataBase {self.host}: {self.port}] Recebido confirmação de recebimento de {message['addr']}")
             self.message_stage["number_confirms"] += 1
 
         if message["type"] == MessageType.HEART_BEAT:
@@ -92,11 +107,19 @@ class Node:
                 "content": "I am received the message."
             }
             self.message_stage = message["content"]
+
+            print(f'[DataBase {self.host}: {self.port}] Comando {self.message_stage} escrito e enviando '
+                        'confirmação de recebimento para líder.')
             self.send(msg=msg, addr=self.leader_addr)
 
         if message["type"] == MessageType.COMMIT:
             # TODO: Lógica para commitar a mensagem
             self.message_stage = None
+            print(f"[DataBase {self.host}: {self.port}] Commitando ...")
+
+        if message["type"] == MessageType.LEADER_ANNOUNCE:
+            self.leader_addr = message["addr"]
+            print(f"[DataBase {self.host}: {self.port}] Aceitando novo líder {self.leader_addr}")
 
     def send(self, msg: dict, addr):
         """
@@ -105,7 +128,6 @@ class Node:
         :param addr: addr
         :return:
         """
-
         self.__start_connection(addr)
         self.socket_members.send(pickle.dumps(msg))
         self.__close_connection()
@@ -125,10 +147,10 @@ class Node:
         :param msg:
         :return:
         """
-        for addr_member in self.members:
-            if addr_member[1] == self.port:
+        for idf, (host, port) in self.members.items():
+            if port == self.port:
                 continue
-            self.send(msg, addr_member)
+            self.send(msg, (host, port))
 
     def coordinate(self):
         """
@@ -150,6 +172,7 @@ class Node:
                 else:
                     continue
             else:
+                print(f"[DataBase {self.host}: {self.port}] Enviando novo comando para todos os membros")
                 self.message_stage = {
                     "command": self.queue_commands.pop(),
                     "number_confirms": 0
@@ -190,7 +213,16 @@ class Node:
             conn.close()
 
 
-server = Node(host="localhost", port=8942)
-server.request_group_add()
-# TODO: Colocar 3 funções em uma thread
-server.listen_connections()
+server = Node(host="localhost", port=8946)
+
+process_list = list()
+
+process_list.append(Process(target=server.request_group_add()))
+process_list.append(Process(target=server.listen_connections()))
+process_list.append(Process(target=server.coordinate()))
+
+for t in process_list:
+    t.start()
+
+for t in process_list:
+    t.join()
