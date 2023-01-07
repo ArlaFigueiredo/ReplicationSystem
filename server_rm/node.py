@@ -173,6 +173,8 @@ class Node:
         :return:
         """
         while True:
+            await self.heart_beat()
+
             if not self.is_leader:
                 await asyncio.sleep(3)
                 continue
@@ -213,32 +215,32 @@ class Node:
 
         :return:
         """
-        while True:
-            msg = {
-                "sender": SenderTypes.SERVER_DBM,
-                "type": MessageType.HEART_BEAT,
-                "addr": (self.host, self.port),
-                "content": "Are you alive?",
-            }
+        # while True:
+        msg = {
+            "sender": SenderTypes.SERVER_DBM,
+            "type": MessageType.HEART_BEAT,
+            "addr": (self.host, self.port),
+            "content": "Are you alive?",
+        }
 
-            if self.is_leader:
-                for idf, member_addr in self.members.items():
-                    if idf == self.idf:
-                        continue
-                    try:
-                        self.send(msg=msg, addr=member_addr)
-                    except ConnectionRefusedError:
-                        print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
-                        # TODO: Remover
-
-            else:
+        if self.is_leader:
+            for idf, member_addr in self.members.items():
+                if idf == self.idf:
+                    continue
                 try:
-                    self.send(msg=msg, addr=self.leader_addr)
+                    self.send(msg=msg, addr=member_addr)
                 except ConnectionRefusedError:
-                    print("O líder está off, vou iniciar uma eleição.")
-                    # TODO: Iniciar Eleição
+                    print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
+                    # TODO: Remover
 
-            await asyncio.sleep(10)
+        else:
+            try:
+                self.send(msg=msg, addr=self.leader_addr)
+            except ConnectionRefusedError:
+                print("O líder está off, vou iniciar uma eleição.")
+                # TODO: Iniciar Eleição
+
+        # await asyncio.sleep(10)
 
     async def listen_connections(self):
         """
@@ -285,7 +287,7 @@ async def start():
     task_list.append(asyncio.create_task(server.request_group_add()))
     task_list.append(asyncio.create_task(server.listen_connections()))
     task_list.append(asyncio.create_task(server.coordinate()))
-    task_list.append(asyncio.create_task(server.heart_beat()))
+    # task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
