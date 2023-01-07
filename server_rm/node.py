@@ -219,7 +219,7 @@ class Node:
         """
         # while True:
 
-        if (datetime.now() - self.last_execute).seconds <= 60:
+        if (datetime.now() - self.last_execute).seconds <= 30:
             return
 
         self.last_execute = datetime.now()
