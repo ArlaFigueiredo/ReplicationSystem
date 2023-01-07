@@ -224,7 +224,9 @@ class Node:
         }
 
         if self.is_leader:
+            print("[heart_beat] is leader")
             for idf, member_addr in self.members.items():
+                print(f"[heart_beat] enviando para {member_addr}")
                 if idf == self.idf:
                     continue
                 try:
@@ -234,7 +236,9 @@ class Node:
                     # TODO: Remover
 
         else:
+            print("[heart_beat] is replica")
             try:
+                print(f"[heart_beat] enviando para lider")
                 self.send(msg=msg, addr=self.leader_addr)
             except ConnectionRefusedError:
                 print("O líder está off, vou iniciar uma eleição.")
