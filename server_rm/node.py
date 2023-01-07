@@ -80,6 +80,10 @@ class Node:
             print(f"[DataBase {self.host}:{self.port}] Líder recebeu o comando SQL e irá enviar aos demais.")
             self.queue_commands.append(message["content"])
 
+        if message["type"] == MessageType.HEART_BEAT:
+
+            print(f"Recebendo um Heart Beat de RM")
+
     def upgrade_to_leader(self):
 
         print(f"[DataBase {self.host}:{self.port}] Upgrade para líder.")
@@ -175,7 +179,6 @@ class Node:
         :return:
         """
         while True:
-            await self.heart_beat()
 
             if not self.is_leader:
                 await asyncio.sleep(3)
@@ -218,7 +221,6 @@ class Node:
         :return:
         """
         # while True:
-        print(f"[HEART_BEAT]{(datetime.now() - self.last_execute).seconds}")
         if (datetime.now() - self.last_execute).seconds < 30:
             return
 
@@ -231,9 +233,7 @@ class Node:
             "content": "Are you alive?",
         }
 
-        self.send(msg=msg, addr=(settings.server.HOST, settings.server.PORT))
-
-        """if self.is_leader:
+        if self.is_leader:
             print("[heart_beat] is leader")
             for idf, member_addr in self.members.items():
                 print(f"[heart_beat] enviando para {member_addr}")
@@ -252,7 +252,7 @@ class Node:
                 self.send(msg=msg, addr=self.leader_addr)
             except ConnectionRefusedError:
                 print("O líder está off, vou iniciar uma eleição.")
-                # TODO: Iniciar Eleição"""
+                # TODO: Iniciar Eleição
 
         # await asyncio.sleep(10)
 
