@@ -1,5 +1,7 @@
 import socket
 import pickle
+import datetime
+import time
 
 from message_params import MessageType, SenderTypes
 from config import settings
@@ -15,6 +17,8 @@ class Node:
         self.socket_members = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.members = {}
+        self.alive_members = {}
+        self.leader_status = {}
         self.is_leader = False
         self.leader_addr = None
         self.queue_commands = []
@@ -54,6 +58,9 @@ class Node:
 
         if message["type"] == MessageType.SQL_COMMAND and self.is_leader:
             self.queue_commands.append(message["content"])
+
+        if message["type"] == MessageType.HEART_BEAT:
+            self.treat_heart_beat_message(message)
 
     def upgrade_to_leader(self):
 
@@ -140,7 +147,53 @@ class Node:
             self.send_to_all_members(msg=msg)
 
     def heart_beat(self):
-        pass
+        while True:
+            if len(members) < 2:
+                continue
+            else:
+                msg = {
+                    "sender": SenderTypes.SERVER_DBM,
+                    "type": MessageType.HEART_BEAT,
+                    "heart_beat_type": "confirm",
+                    "sender_addr": f"{self.host}:{self.port}"
+                }
+                if self.is_leader:
+                    for member in self.members:
+                        self.alive_members.update({
+                            member.addr: {
+                                "sended_at": datetime.now(),
+                                "confirmed_at": None
+                            }
+                        })
+                    self.send_to_all_members(msg)
+                else:
+                    self.leader_status = {
+                        self.leader_addr: {
+                            "sended_at": datetime.now(),
+                            "confirmed_at": None
+                        }
+                    }
+                    self.send(msg,self.leader_addr)
+            time.sleep(60)
+
+    def treat_heart_beat_message(self, message):
+        if message.heart_beat_type == 'confirm':
+            msg = {
+                "type": MessageType.HEART_BEAT,
+                "sender": SenderTypes.SERVER_DBM,
+                "heart_beat_type": "confirmed",
+                "confirmed_at": datetime.now(),
+                "sender_addr": f"{self.host}:{self.port}"
+            }
+            self.send(msg, message.sender_addr)
+        if message.heart_beat_type == "confirmed":
+            member = self.alive_members[message.sender_addr]
+            send_time = member.sended_at
+            confirm_time = message.confirmed_at
+            seconds_diff = (confirm_time - send_time).total_second()
+            if seconds_diff > 60:
+            #TODO remover membro do grupo
+            del self.alive_members[message.sender_addr]
 
     def listen_connections(self):
         """
