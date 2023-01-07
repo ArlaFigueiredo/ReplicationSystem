@@ -33,7 +33,7 @@ class ReplicationManagerServer:
         :param message:
         :return:
         """
-        if message["type"] == MessageType.REQUEST:
+        if message["type"] == MessageType.GROUP_REQUEST:
             self.__include_dbm_member(host=message["addr"][0], port=message["addr"][1])
             msg = {
                 "sender": SenderTypes.SERVER_RM,

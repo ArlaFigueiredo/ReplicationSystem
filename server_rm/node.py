@@ -11,14 +11,14 @@ class Node:
         self.host = host
         self.port = port
 
-        self.socket = socket.socket(family=socket.AF_INET)
+        self.socket = socket.socket()
         self.socket_members = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.members = {}
         self.is_leader = False
         self.leader_addr = None
-        self.queue_commands = []
 
+        self.queue_commands = []
         self.message_stage = None
 
     def __start_connection(self, addr):
@@ -44,10 +44,15 @@ class Node:
         self.socket.listen(0)
 
     def __treat_rm_message(self, message: dict):
+        """
+
+        :param message:
+        :return:
+        """
         if message["type"] == MessageType.CONFIRM:
             self.members = message["content"]
             self.leader_addr = message["leader_addr"]
-            if message["receiver"][1] == self.port:
+            if message["receiver"][0] == self.host and message["receiver"][1] == self.port:
                 self.idf = message["identifier"]
             if len(self.members.keys) == 1:
                 self.upgrade_to_leader()
@@ -71,9 +76,27 @@ class Node:
         self.send_to_all_members(msg=msg)
 
     def __treat_dbm_message(self, message: dict):
-        # Tratar resposta do STAGE (CONFIRM)
-        # Tratar resposta do PING (HEART BEAT)
-        pass
+
+        if message["type"] == MessageType.CONFIRM:
+            self.message_stage["number_confirms"] += 1
+
+        if message["type"] == MessageType.HEART_BEAT:
+            # Tratar resposta do PING (HEART BEAT)
+            pass
+
+        if message["type"] == MessageType.STAGE:
+            msg = {
+                "sender": SenderTypes.SERVER_DBM,
+                "type": MessageType.CONFIRM,
+                "addr": (self.host, self.port),
+                "content": "I am received the message."
+            }
+            self.message_stage = message["content"]
+            self.send(msg=msg, addr=self.leader_addr)
+
+        if message["type"] == MessageType.COMMIT:
+            # TODO: Lógica para commitar a mensagem
+            self.message_stage = None
 
     def send(self, msg: dict, addr):
         """
@@ -90,7 +113,7 @@ class Node:
     def request_group_add(self):
         msg = {
             "sender": SenderTypes.SERVER_DBM,
-            "type": MessageType.REQUEST,
+            "type": MessageType.GROUP_REQUEST,
             "addr": (self.host, self.port),
             "content": "I want join to the group."
         }
