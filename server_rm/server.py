@@ -12,7 +12,7 @@ class ReplicationManagerServer:
         self.max_connections = 30
 
         self.socket = socket.socket()
-        self.socket_dbm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket_dbm = None
 
         self.db_managers = {}
         self.leader_addr = None
@@ -59,6 +59,7 @@ class ReplicationManagerServer:
         Start connection with RM
         :return:
         """
+        self.socket_dbm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket_dbm.connect(addr)
 
     def __close_connection(self):

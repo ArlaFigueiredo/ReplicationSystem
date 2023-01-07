@@ -1,8 +1,9 @@
+import asyncio
 import socket
 import pickle
 import logging
+import argparse
 
-from multiprocessing import Process
 from message_params import MessageType, SenderTypes
 from config import settings
 
@@ -109,7 +110,7 @@ class Node:
             self.message_stage = message["content"]
 
             print(f'[DataBase {self.host}: {self.port}] Comando {self.message_stage} escrito e enviando '
-                        'confirmação de recebimento para líder.')
+                  f'confirmação de recebimento para líder.')
             self.send(msg=msg, addr=self.leader_addr)
 
         if message["type"] == MessageType.COMMIT:
@@ -132,7 +133,7 @@ class Node:
         self.socket_members.send(pickle.dumps(msg))
         self.__close_connection()
 
-    def request_group_add(self):
+    async def request_group_add(self):
         msg = {
             "sender": SenderTypes.SERVER_DBM,
             "type": MessageType.GROUP_REQUEST,
@@ -152,27 +153,31 @@ class Node:
                 continue
             self.send(msg, (host, port))
 
-    def coordinate(self):
+    async def coordinate(self):
         """
 
         :return:
         """
+        print("Iniciando processo de coordenação")
         while True:
             if not self.is_leader or not self.queue_commands:
+                await asyncio.sleep(3)
                 continue
 
             if self.message_stage:
-                if self.message_stage["number_confirms"] == len(self.members) - 1:
+                if self.message_stage["number_confirms"] == len(self.members.keys()) - 1:
+                    print(f"[DataBase {self.host}: {self.port}] Confirmação recebida por todos os membros...")
                     msg = {
                         "sender": SenderTypes.SERVER_DBM,
                         "type": MessageType.COMMIT,
                         "content": self.message_stage["command"]
                     }
                     self.message_stage = None
+                    # TODO: O nó lider deve commitar tbm
                 else:
                     continue
             else:
-                print(f"[DataBase {self.host}: {self.port}] Enviando novo comando para todos os membros")
+                print(f"[DataBase {self.host}: {self.port}] Enviando novo comando para todos os membros...")
                 self.message_stage = {
                     "command": self.queue_commands.pop(),
                     "number_confirms": 0
@@ -184,11 +189,12 @@ class Node:
                 }
 
             self.send_to_all_members(msg=msg)
+            await asyncio.sleep(1)
 
     def heart_beat(self):
         pass
 
-    def listen_connections(self):
+    async def listen_connections(self):
         """
         Listen external connections
         :return:
@@ -211,18 +217,29 @@ class Node:
                     self.__treat_dbm_message(message)
 
             conn.close()
+            await asyncio.sleep(1)
 
 
-server = Node(host="localhost", port=8946)
+async def start():
+    # Initialize parser
+    parser = argparse.ArgumentParser()
 
-process_list = list()
+    # Adding arguments
+    parser.add_argument("-a", dest="host", help="Host of Node")
 
-process_list.append(Process(target=server.request_group_add()))
-process_list.append(Process(target=server.listen_connections()))
-process_list.append(Process(target=server.coordinate()))
+    parser.add_argument("-p", dest="port", help="Port of Node")
 
-for t in process_list:
-    t.start()
+    # Read arguments from command line
+    args = parser.parse_args()
 
-for t in process_list:
-    t.join()
+    server = Node(host=args.host, port=int(args.port))
+
+    task_list = list()
+
+    task_list.append(asyncio.create_task(server.request_group_add()))
+    task_list.append(asyncio.create_task(server.listen_connections()))
+    task_list.append(asyncio.create_task(server.coordinate()))
+
+    await asyncio.gather(*task_list)
+
+asyncio.run(start())
