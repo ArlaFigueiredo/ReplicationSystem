@@ -229,12 +229,14 @@ class Node:
                     if not member_info:
                         self.alive_checker[member_addr] = {
                             "last_sended_at": datetime.now(),
-                            "confirmed_at": None
                         }
-                        self.send(msg=msg, addr=member_addr)
+                        try:
+                            self.send(msg=msg, addr=member_addr)
+                        except ConnectionRefusedError:
+                            print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
                     else:
                         delta = datetime.now() - member_info["last_sended_at"]
-                        if not member_info["confirmed_at"] and delta.total_seconds() > 120:
+                        if delta.total_seconds() > 120:
                             print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
                             # TODO: Remover esse membro do grupo
                             pass
@@ -253,7 +255,7 @@ class Node:
                         # TODO: Iniciar Eleição
                         pass
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(0.5)
 
     async def listen_connections(self):
         """
@@ -300,7 +302,7 @@ async def start():
     task_list.append(asyncio.create_task(server.request_group_add()))
     task_list.append(asyncio.create_task(server.listen_connections()))
     task_list.append(asyncio.create_task(server.coordinate()))
-    #task_list.append(asyncio.create_task(server.heart_beat()))
+    task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
