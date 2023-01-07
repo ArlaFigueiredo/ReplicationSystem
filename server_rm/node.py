@@ -102,7 +102,7 @@ class Node:
             print(f"[DataBase {self.host}: {self.port}] Recebido confirmação de recebimento de {message['addr']}")
             self.message_stage["number_confirms"] += 1
 
-        if message["type"] == MessageType.HEART_BEAT:
+        """if message["type"] == MessageType.HEART_BEAT:
 
             print(f"Recebendo um Heart Beat de {message['addr']}")
 
@@ -112,7 +112,7 @@ class Node:
                 except KeyError:
                     pass
             else:
-                self.leader_alive_checker = None
+                self.leader_alive_checker = None"""
 
         if message["type"] == MessageType.STAGE:
             msg = {
@@ -225,37 +225,20 @@ class Node:
                 for idf, member_addr in self.members.items():
                     if idf == self.idf:
                         continue
-                    member_info = self.alive_checker.get(member_addr)
-                    if not member_info:
-                        self.alive_checker[member_addr] = {
-                            "last_sended_at": datetime.now(),
-                        }
-                        try:
-                            self.send(msg=msg, addr=member_addr)
-                        except ConnectionRefusedError:
-                            print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
-                    else:
-                        delta = datetime.now() - member_info["last_sended_at"]
-                        if delta.total_seconds() > 120:
-                            print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
-                            # TODO: Remover esse membro do grupo
-                            pass
+                    try:
+                        self.send(msg=msg, addr=member_addr)
+                    except ConnectionRefusedError:
+                        print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
+                        # TODO: Remover
 
             else:
-                if not self.leader_alive_checker:
-                    self.leader_alive_checker = {
-                        "last_sended_at": datetime.now(),
-                        "confirmed_at": None
-                    }
+                try:
                     self.send(msg=msg, addr=self.leader_addr)
-                else:
-                    delta = datetime.now() - self.leader_alive_checker["last_sended_at"]
-                    if not self.leader_alive_checker["confirmed_at"] and delta.total_seconds() > 120:
-                        print("O líder está off, vou iniciar uma eleição.")
-                        # TODO: Iniciar Eleição
-                        pass
+                except ConnectionRefusedError:
+                    print("O líder está off, vou iniciar uma eleição.")
+                    # TODO: Iniciar Eleição
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(10)
 
     async def listen_connections(self):
         """
