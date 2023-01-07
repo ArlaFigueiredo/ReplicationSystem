@@ -218,8 +218,8 @@ class Node:
         :return:
         """
         # while True:
-
-        if (datetime.now() - self.last_execute).seconds <= 30:
+        print(f"[HEART_BEAT]{(datetime.now() - self.last_execute).seconds}")
+        if (datetime.now() - self.last_execute).seconds < 30:
             return
 
         self.last_execute = datetime.now()
