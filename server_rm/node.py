@@ -33,6 +33,8 @@ class Node:
         self.alive_checker = {}
         self.leader_alive_checker = None
 
+        self.last_execute = datetime.now()
+
     def __start_connection(self, addr):
         """
         Start connection
@@ -216,6 +218,12 @@ class Node:
         :return:
         """
         # while True:
+
+        if (datetime.now() - self.last_execute).seconds <= 60:
+            return
+
+        self.last_execute = datetime.now()
+
         msg = {
             "sender": SenderTypes.SERVER_DBM,
             "type": MessageType.HEART_BEAT,
