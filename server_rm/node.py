@@ -222,8 +222,6 @@ class Node:
         :return:
         """
         while True:
-            print("Rodando [heart-beat]")
-
             msg = {
                 "sender": SenderTypes.SERVER_DBM,
                 "type": MessageType.HEART_BEAT,
@@ -237,8 +235,7 @@ class Node:
                         continue
                     member_info = self.alive_checker.get(member_addr)
                     if not member_info:
-                        member_info = dict()
-                        member_info[member_addr] = {
+                        self.alive_checker[member_addr] = {
                             "last_sended_at": datetime.now(),
                             "confirmed_at": None
                         }
