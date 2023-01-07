@@ -4,6 +4,8 @@ import pickle
 import logging
 import argparse
 
+from datetime import datetime
+
 from message_params import MessageType, SenderTypes
 from config import settings
 
@@ -26,6 +28,9 @@ class Node:
 
         self.queue_commands = []
         self.message_stage = None
+
+        self.alive_checker = {}
+        self.leader_alive_checker = None
 
     def __start_connection(self, addr):
         """
@@ -97,8 +102,16 @@ class Node:
             self.message_stage["number_confirms"] += 1
 
         if message["type"] == MessageType.HEART_BEAT:
-            # Tratar resposta do PING (HEART BEAT)
-            pass
+
+            print(f"Recebendo um Heart Beat de {message['addr']}")
+            member_info = self.alive_checker.get(message["addr"])
+            if not member_info:
+                self.alive_checker[message["addr"]] = {
+                    "last_sended_at": datetime.now(),
+                    "confirmed_at": datetime.now()
+                }
+            else:
+                self.alive_checker[message["addr"]]["confirmed_at"] = datetime.now()
 
         if message["type"] == MessageType.STAGE:
             msg = {
@@ -158,25 +171,29 @@ class Node:
 
         :return:
         """
-        print("Iniciando processo de coordenação")
+        print("Processo de coordenação Iniciado")
         while True:
-            if not self.is_leader or not self.queue_commands:
+            if not self.is_leader:
                 await asyncio.sleep(3)
                 continue
 
             if self.message_stage:
                 if self.message_stage["number_confirms"] == len(self.members.keys()) - 1:
-                    print(f"[DataBase {self.host}: {self.port}] Confirmação recebida por todos os membros...")
+                    print(f"[DataBase {self.host}: {self.port}] Confirmação recebida por todos os membros, "
+                          f"irei mandar o commit...")
                     msg = {
                         "sender": SenderTypes.SERVER_DBM,
                         "type": MessageType.COMMIT,
                         "content": self.message_stage["command"]
                     }
+                    self.send_to_all_members(msg=msg)
+
                     self.message_stage = None
                     # TODO: O nó lider deve commitar tbm
                 else:
                     continue
-            else:
+
+            if not self.message_stage and self.queue_commands:
                 print(f"[DataBase {self.host}: {self.port}] Enviando novo comando para todos os membros...")
                 self.message_stage = {
                     "command": self.queue_commands.pop(),
@@ -188,11 +205,64 @@ class Node:
                     "content": self.message_stage["command"]
                 }
 
-            self.send_to_all_members(msg=msg)
+                self.send_to_all_members(msg=msg)
+
             await asyncio.sleep(1)
 
-    def heart_beat(self):
-        pass
+    async def heart_beat(self):
+        """
+
+        :return:
+        """
+        while True:
+
+            msg = {
+                "sender": SenderTypes.SERVER_DBM,
+                "type": MessageType.HEART_BEAT,
+                "addr": (self.host, self.port),
+                "content": "Are you alive?",
+            }
+
+            if self.is_leader:
+                for idf, member_addr in self.members.items():
+                    if idf == self.idf:
+                        continue
+                    member_info = self.alive_checker.get(member_addr)
+                    if not member_info:
+                        member_info = dict()
+                        member_info[member_addr] = {
+                            "last_sended_at": datetime.now(),
+                            "confirmed_at": None
+                        }
+                        self.send(msg=msg, addr=member_addr)
+                    else:
+                        delta = datetime.now() - member_info["last_sended_at"]
+                        if not member_info["confirmed_at"] and delta.total_seconds() > 120:
+                            print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
+                            # TODO: Remover esse membro do grupo
+                            pass
+
+                        if member_info["confirmed_at"]:
+                            self.alive_checker.pop(member_addr)
+
+            else:
+                if not self.leader_alive_checker:
+                    self.leader_alive_checker = {
+                        "last_sended_at": datetime.now(),
+                        "confirmed_at": None
+                    }
+                    self.send(msg=msg, addr=self.leader_addr)
+                else:
+                    delta = datetime.now() - self.leader_alive_checker["last_sended_at"]
+                    if not self.leader_alive_checker["confirmed_at"] and delta.total_seconds() > 120:
+                        print("O líder está off, vou iniciar uma eleição.")
+                        # TODO: Iniciar Eleição
+                        pass
+
+                    if self.leader_alive_checker["confirmed_at"]:
+                        self.leader_alive_checker = None
+
+            await asyncio.sleep(3)
 
     async def listen_connections(self):
         """
@@ -239,6 +309,7 @@ async def start():
     task_list.append(asyncio.create_task(server.request_group_add()))
     task_list.append(asyncio.create_task(server.listen_connections()))
     task_list.append(asyncio.create_task(server.coordinate()))
+    task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
