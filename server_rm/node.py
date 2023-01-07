@@ -178,7 +178,6 @@ class Node:
 
         :return:
         """
-        print("Processo de coordenação Iniciado")
         while True:
             if not self.is_leader:
                 await asyncio.sleep(3)
