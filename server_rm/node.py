@@ -1,10 +1,8 @@
 import asyncio
-import random
 import socket
 import pickle
 import logging
 import argparse
-import time
 
 from datetime import datetime
 
@@ -58,7 +56,7 @@ class Node:
         :return:
         """
         self.socket.bind((self.host, self.port))
-        self.socket.listen(0)
+        self.socket.listen(30)
 
     def __treat_rm_message(self, message: dict):
         """
@@ -272,21 +270,6 @@ class Node:
 
             await asyncio.sleep(2)
 
-    async def on_new_client(self, conn):
-        encoded_message = conn.recv(1000)
-        if len(encoded_message) == 0:
-            pass
-        else:
-            message = pickle.loads(encoded_message)
-
-            if message["sender"] == SenderTypes.SERVER_RM:
-                self.__treat_rm_message(message)
-
-            if message["sender"] == SenderTypes.SERVER_DBM:
-                self.__treat_dbm_message(message)
-
-        conn.close()
-
     async def listen_connections(self):
         """
         Listen external connections
@@ -295,18 +278,22 @@ class Node:
         self.__bind()
 
         while True:
+            conn, addr = self.socket.accept()
 
-            counter = 0
-            tasks = list()
-            while counter < 2:
+            encoded_message = conn.recv(1000)
+            if len(encoded_message) == 0:
+                pass
+            else:
+                message = pickle.loads(encoded_message)
 
-                conn, addr = self.socket.accept()
-                tasks.append(asyncio.create_task(self.on_new_client(conn)))
-                counter += 1
+                if message["sender"] == SenderTypes.SERVER_RM:
+                    self.__treat_rm_message(message)
 
-            await asyncio.gather(*tasks)
+                if message["sender"] == SenderTypes.SERVER_DBM:
+                    self.__treat_dbm_message(message)
 
-            await asyncio.sleep(0.1)
+            conn.close()
+            await asyncio.sleep(1)
 
 
 async def start():
@@ -328,7 +315,7 @@ async def start():
     task_list.append(asyncio.create_task(server.request_group_add()))
     task_list.append(asyncio.create_task(server.listen_connections()))
     task_list.append(asyncio.create_task(server.coordinate()))
-    # task_list.append(asyncio.create_task(server.heart_beat()))
+    task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
