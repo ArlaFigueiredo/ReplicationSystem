@@ -302,6 +302,7 @@ class Node:
 
                 conn, addr = self.socket.accept()
                 tasks.append(asyncio.create_task(self.on_new_client(conn, addr)))
+                counter += 1
 
             await asyncio.gather(*tasks)
 
