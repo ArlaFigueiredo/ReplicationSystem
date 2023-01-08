@@ -296,13 +296,19 @@ class Node:
 
         while True:
 
-            counter = 0
             tasks = list()
-            while counter < 10:
 
-                conn, addr = self.socket.accept()
+            list_sock = []
+            for i in range(3):
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind((self.host, self.port))
+                s.listen(10)
+                list_sock.append(s)
+
+            for sock in list_sock:
+                conn, addr = sock.accept()
                 tasks.append(asyncio.create_task(self.on_new_client(conn, addr)))
-                counter += 1
 
             await asyncio.gather(*tasks)
 
