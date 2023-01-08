@@ -107,28 +107,28 @@ class ReplicationManagerServer:
 
         :return:
         """
-        while True:
-            print("[Server RM] Enviando heartbeat")
-            if (datetime.now() - self.last_execute).seconds < 10:
-                return
+        #while True:
+        print("[Server RM] Enviando heartbeat")
+        if (datetime.now() - self.last_execute).seconds < 10:
+            return
 
-            self.last_execute = datetime.now()
+        self.last_execute = datetime.now()
 
-            msg = {
-                "sender": SenderTypes.SERVER_DBM,
-                "type": MessageType.HEART_BEAT,
-                "addr": (self.host, self.port),
-                "content": "Are you alive?",
-            }
+        msg = {
+            "sender": SenderTypes.SERVER_DBM,
+            "type": MessageType.HEART_BEAT,
+            "addr": (self.host, self.port),
+            "content": "Are you alive?",
+        }
 
-            for idf, addr in self.db_managers.items():
+        for idf, addr in self.db_managers.items():
 
-                try:
-                    self.send(msg, addr)
-                except ConnectionRefusedError:
-                    print(f"O nó {addr} tá OFF.")
+            try:
+                self.send(msg, addr)
+            except ConnectionRefusedError:
+                print(f"O nó {addr} tá OFF.")
 
-            await asyncio.sleep(2)
+        # await asyncio.sleep(2)
 
     async def listen_connections(self):
         """
@@ -139,6 +139,7 @@ class ReplicationManagerServer:
 
         print("[Server RM] Escutando conexões")
         while True:
+            await self.heart_beat()
             conn, addr = self.socket.accept()
 
             encoded_message = conn.recv(1000)
@@ -166,7 +167,7 @@ async def start():
     task_list = list()
 
     task_list.append(asyncio.create_task(server.listen_connections()))
-    task_list.append(asyncio.create_task(server.heart_beat()))
+    # task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
