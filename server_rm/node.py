@@ -130,11 +130,7 @@ class Node:
             print(f'[DataBase {self.host}: {self.port}] Comando {self.message_stage} escrito e enviando '
                   f'confirmação de recebimento para líder.')
 
-            attempts = 0
-            while attempts <= 3:
-                time.sleep(random.randint(1, 5))
-                self.send(msg=msg, addr=self.leader_addr)
-                attempts += 1
+            self.send(msg=msg, addr=self.leader_addr)
 
         if message["type"] == MessageType.COMMIT:
             execute_sql(idf=self.idf, sql_raw=self.message_stage)
@@ -276,6 +272,21 @@ class Node:
 
             await asyncio.sleep(2)
 
+    async def on_new_client(self, conn, addr):
+        encoded_message = conn.recv(1000)
+        if len(encoded_message) == 0:
+            pass
+        else:
+            message = pickle.loads(encoded_message)
+
+            if message["sender"] == SenderTypes.SERVER_RM:
+                self.__treat_rm_message(message)
+
+            if message["sender"] == SenderTypes.SERVER_DBM:
+                self.__treat_dbm_message(message)
+
+        conn.close()
+
     async def listen_connections(self):
         """
         Listen external connections
@@ -284,21 +295,16 @@ class Node:
         self.__bind()
 
         while True:
-            conn, addr = self.socket.accept()
 
-            encoded_message = conn.recv(1000)
-            if len(encoded_message) == 0:
-                pass
-            else:
-                message = pickle.loads(encoded_message)
+            counter = 0
+            tasks = list()
+            while counter < 10:
 
-                if message["sender"] == SenderTypes.SERVER_RM:
-                    self.__treat_rm_message(message)
+                conn, addr = self.socket.accept()
+                tasks.append(asyncio.create_task(self.on_new_client(conn, addr)))
 
-                if message["sender"] == SenderTypes.SERVER_DBM:
-                    self.__treat_dbm_message(message)
+            await asyncio.gather(*tasks)
 
-            conn.close()
             await asyncio.sleep(1)
 
 
