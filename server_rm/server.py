@@ -108,6 +108,7 @@ class ReplicationManagerServer:
         :return:
         """
         while True:
+            print("[Server RM] Enviando heartbeat")
             if (datetime.now() - self.last_execute).seconds < 10:
                 return
 
@@ -127,7 +128,9 @@ class ReplicationManagerServer:
                 except ConnectionRefusedError:
                     print(f"O nó {addr} tá OFF.")
 
-    def listen_connections(self):
+            await asyncio.sleep(2)
+
+    async def listen_connections(self):
         """
         Listen external connections
         :return:
@@ -158,7 +161,7 @@ class ReplicationManagerServer:
             conn.close()
 
 
-def start():
+async def start():
     server = ReplicationManagerServer()
     task_list = list()
 
