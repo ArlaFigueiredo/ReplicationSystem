@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 client_sql = ClientSQL()
 
 commands = [
+    "UPDATE banco SET saldo = 300 WHERE conta=1 ",
+    "UPDATE banco SET saldo = 400 WHERE conta=1 ",
     "UPDATE banco SET saldo = 500 WHERE conta=1 ",
-    "UPDATE banco SET saldo = 100 WHERE conta=1 ",
 ]
 
 # Embaralhando ordem de execução
