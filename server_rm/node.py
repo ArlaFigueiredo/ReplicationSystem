@@ -130,12 +130,11 @@ class Node:
             print(f'[DataBase {self.host}: {self.port}] Comando {self.message_stage} escrito e enviando '
                   f'confirmação de recebimento para líder.')
 
-            # attempts = 0
-            # while attempts <= 3:
-            time.sleep(random.randint(1, 5))
-            self.send(msg=msg, addr=self.leader_addr)
-
-            # attempts += 1
+            attempts = 0
+            while attempts <= 3:
+                time.sleep(random.randint(1, 5))
+                self.send(msg=msg, addr=self.leader_addr)
+                attempts += 1
 
         if message["type"] == MessageType.COMMIT:
             execute_sql(idf=self.idf, sql_raw=self.message_stage)
@@ -189,7 +188,7 @@ class Node:
                 continue
 
             if self.message_stage:
-                if self.message_stage["number_confirms"] == len(self.members.keys()) - 1:
+                if self.message_stage["number_confirms"] >= len(self.members.keys()) - 1:
                     print(f"[DataBase {self.host}: {self.port}] Confirmação recebida por todos os membros, "
                           f"irei mandar o commit...")
                     msg = {
