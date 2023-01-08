@@ -1,7 +1,6 @@
 import pickle
 import socket
 import asyncio
-from datetime import datetime
 
 from message_params import MessageType, SenderTypes
 from config import settings
@@ -19,8 +18,6 @@ class ReplicationManagerServer:
         self.db_managers = {}
         self.leader_addr = None
         self.counter = 0
-
-        self.last_execute = datetime.now()
 
     def __include_dbm_member(self, host: str, port: int):
         """

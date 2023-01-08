@@ -3,7 +3,6 @@ import socket
 import pickle
 import logging
 import argparse
-import Pyro4
 
 from datetime import datetime
 
@@ -105,9 +104,9 @@ class Node:
             print(f"[DataBase {self.host}: {self.port}] Recebido confirmação de recebimento de {message['addr']}")
             self.message_stage["number_confirms"] += 1
 
-        """if message["type"] == MessageType.HEART_BEAT:
+        if message["type"] == MessageType.HEART_BEAT:
 
-            print(f"Recebendo um Heart Beat de {message['addr']}")
+            print(f"Recebendo um heart-beat de {message['addr']}")
 
             if self.is_leader:
                 try:
@@ -115,7 +114,7 @@ class Node:
                 except KeyError:
                     pass
             else:
-                self.leader_alive_checker = None"""
+                self.leader_alive_checker = None
 
         if message["type"] == MessageType.STAGE:
             msg = {
@@ -212,6 +211,22 @@ class Node:
 
             await asyncio.sleep(1)
 
+    def __start_election(self):
+        """
+
+        :return:
+        """
+        raise NotImplementedError
+
+    def __remove_member(self, idf_member):
+        """
+
+        :param idf_member:
+        :return:
+        """
+
+        self.members.pop(idf_member)
+
     async def heart_beat(self):
         """
 
@@ -231,34 +246,28 @@ class Node:
                 "content": "Are you alive?",
             }
 
-            server = Pyro4.Proxy(f"PYRONAME:mess.server")
-            now = datetime.now()
+            if self.is_leader:
+                print("[heart_beat] is leader")
+                for idf, member_addr in self.members.items():
+                    print(f"[heart_beat] enviando para {member_addr}")
+                    if idf == self.idf:
+                        continue
+                    try:
+                        self.send(msg=msg, addr=member_addr)
+                    except ConnectionRefusedError:
+                        print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
+                        self.__remove_member(idf)
 
-            server.send_message(pickle.dumps(msg))
-            print(f'sent at {now:%H:%M:%S}')
-
-        """if self.is_leader:
-            print("[heart_beat] is leader")
-            for idf, member_addr in self.members.items():
-                print(f"[heart_beat] enviando para {member_addr}")
-                if idf == self.idf:
-                    continue
+            else:
+                print("[heart_beat] is replica")
                 try:
-                    self.send(msg=msg, addr=member_addr)
+                    print(f"[heart_beat] enviando para lider")
+                    self.send(msg=msg, addr=self.leader_addr)
                 except ConnectionRefusedError:
-                    print(f"Membro cujo ID é {idf} está off, vou remove-lo do grupo")
-                    # TODO: Remover
+                    print("O líder está off, vou iniciar uma eleição.")
+                    self.__start_election()
 
-        else:
-            print("[heart_beat] is replica")
-            try:
-                print(f"[heart_beat] enviando para lider")
-                self.send(msg=msg, addr=self.leader_addr)
-            except ConnectionRefusedError:
-                print("O líder está off, vou iniciar uma eleição.")
-                # TODO: Iniciar Eleição"""
-
-        await asyncio.sleep(2)
+            await asyncio.sleep(2)
 
     async def listen_connections(self):
         """
