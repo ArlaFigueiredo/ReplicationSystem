@@ -3,6 +3,7 @@ import socket
 import pickle
 import logging
 import argparse
+import Pyro4
 
 from datetime import datetime
 
@@ -71,7 +72,7 @@ class Node:
             if message["receiver"][0] == self.host and message["receiver"][1] == self.port:
                 self.idf = message["identifier"]
                 print(f"[DataBase {self.host}:{self.port}] Adicionado ao grupo com sucesso com o "
-                            f"identificador {self.idf}")
+                      f"identificador {self.idf}")
 
                 if len(self.members.keys()) == 1:
                     self.upgrade_to_leader()
@@ -79,10 +80,6 @@ class Node:
         if message["type"] == MessageType.SQL_COMMAND and self.is_leader:
             print(f"[DataBase {self.host}:{self.port}] Líder recebeu o comando SQL e irá enviar aos demais.")
             self.queue_commands.append(message["content"])
-
-        if message["type"] == MessageType.HEART_BEAT:
-
-            print(f"Recebendo um Heart Beat de RM")
 
     def upgrade_to_leader(self):
 
@@ -220,20 +217,27 @@ class Node:
 
         :return:
         """
-        # while True:
-        if (datetime.now() - self.last_execute).seconds < 30:
-            return
+        while True:
+            print("Heart Beat")
+            if (datetime.now() - self.last_execute).seconds < 10:
+                return
 
-        self.last_execute = datetime.now()
+            self.last_execute = datetime.now()
 
-        msg = {
-            "sender": SenderTypes.SERVER_DBM,
-            "type": MessageType.HEART_BEAT,
-            "addr": (self.host, self.port),
-            "content": "Are you alive?",
-        }
+            msg = {
+                "sender": SenderTypes.SERVER_DBM,
+                "type": MessageType.HEART_BEAT,
+                "addr": (self.host, self.port),
+                "content": "Are you alive?",
+            }
 
-        if self.is_leader:
+            server = Pyro4.Proxy(f"PYRONAME:mess.server")
+            now = datetime.now()
+
+            server.send_message(pickle.dumps(msg))
+            print(f'sent at {now:%H:%M:%S}')
+
+        """if self.is_leader:
             print("[heart_beat] is leader")
             for idf, member_addr in self.members.items():
                 print(f"[heart_beat] enviando para {member_addr}")
@@ -252,9 +256,9 @@ class Node:
                 self.send(msg=msg, addr=self.leader_addr)
             except ConnectionRefusedError:
                 print("O líder está off, vou iniciar uma eleição.")
-                # TODO: Iniciar Eleição
+                # TODO: Iniciar Eleição"""
 
-        # await asyncio.sleep(10)
+        await asyncio.sleep(2)
 
     async def listen_connections(self):
         """
@@ -301,7 +305,7 @@ async def start():
     task_list.append(asyncio.create_task(server.request_group_add()))
     task_list.append(asyncio.create_task(server.listen_connections()))
     task_list.append(asyncio.create_task(server.coordinate()))
-    # task_list.append(asyncio.create_task(server.heart_beat()))
+    task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
