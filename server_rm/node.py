@@ -272,7 +272,7 @@ class Node:
 
             await asyncio.sleep(2)
 
-    async def on_new_client(self, conn, addr):
+    async def on_new_client(self, conn):
         encoded_message = conn.recv(1000)
         if len(encoded_message) == 0:
             pass
@@ -296,23 +296,17 @@ class Node:
 
         while True:
 
+            counter = 0
             tasks = list()
+            while counter < 2:
 
-            list_sock = []
-            for i in range(3):
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind((self.host, self.port))
-                s.listen(10)
-                list_sock.append(s)
-
-            for sock in list_sock:
-                conn, addr = sock.accept()
-                tasks.append(asyncio.create_task(self.on_new_client(conn, addr)))
+                conn, addr = self.socket.accept()
+                tasks.append(asyncio.create_task(self.on_new_client(conn)))
+                counter += 1
 
             await asyncio.gather(*tasks)
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
 
 
 async def start():
