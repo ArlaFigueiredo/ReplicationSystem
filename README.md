@@ -1,5 +1,10 @@
 # ReplicationSystem
 
+Equipe:
+Arla Figueiredo
+Juliana Ribeiro
+Rafael Campos
+
 Este projeto consiste em um trabalho para a Disciplina de Sistemas Distribuidos.
 
 O objetivo é criar um sistema que tenha uma interface de cliente SQL e que efetue uma replicação ativa utilizandos os conceitos de comunicação em grupo.
