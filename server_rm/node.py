@@ -58,7 +58,7 @@ class Node:
         :return:
         """
         self.socket.bind((self.host, self.port))
-        self.socket.listen(30)
+        self.socket.listen(0)
 
     def __treat_rm_message(self, message: dict):
         """
@@ -328,7 +328,7 @@ async def start():
     task_list.append(asyncio.create_task(server.request_group_add()))
     task_list.append(asyncio.create_task(server.listen_connections()))
     task_list.append(asyncio.create_task(server.coordinate()))
-    task_list.append(asyncio.create_task(server.heart_beat()))
+    # task_list.append(asyncio.create_task(server.heart_beat()))
 
     await asyncio.gather(*task_list)
 
